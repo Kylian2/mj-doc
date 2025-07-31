@@ -142,3 +142,87 @@ useFrame((_, __, frame) => {
 
 }
 ```
+
+# How to Make the Player Move
+
+There are two ways to make the player move. First, using the XRReferenceSpace: we make the space move around the player who always stays at the origin. Second, a specific way of React Three Fiber: the XROrigin which represents the virtual position of the player.
+
+One issue that appears is that moving only the XROrigin makes the player's real and virtual positions unsynchronized, which creates problems when we want to access the positions of certain elements (like hand position) which are in the "real world / XRReferenceSpace" coordinate space. You might say "then let's use only the XRReferenceSpace then", but no: when using it we have a one-frame delay between the movements of the player and the movements of the controllers.
+
+**We must investigate to find the better way to make a movement**
+
+## How to Move with XROrigin
+
+Before, make sure you have access to an XROrigin reference.
+
+```js
+useFrame(() => {
+  if (xrOrigin?.current == null || controller == null) {
+    return;
+  }
+
+  // Retrieve controller thumbstick
+  const thumbstickState = controller.gamepad?.["xr-standard-thumbstick"];
+  if (thumbstickState == null) {
+    return;
+  }
+
+  const referenceSpace = gl.xr.getReferenceSpace();
+  if (!referenceSpace) {
+    return;
+  }
+
+  const moveX: number = thumbstickState.xAxis ?? 0;
+  const moveZ: number = thumbstickState.yAxis ?? 0;
+
+  const speed: number = 0.03; // meter or unit per frame
+
+  /* --- Claim headset orientation --- */
+  //
+  /* ----------------------------------------- */
+
+  // Apply orientation
+  const forward = new Vector3();
+  forward.set(0, 0, -1).applyQuaternion(headQuaternion);
+  forward.y = 0;
+  forward.normalize();
+
+  const right = new Vector3();
+  right.set(1, 0, 0).applyQuaternion(headQuaternion);
+  right.y = 0;
+  right.normalize();
+
+  const moveDirection = new Vector3();
+  moveDirection.addScaledVector(forward, -moveZ);
+  moveDirection.addScaledVector(right, moveX);
+
+  // Update position of xrOrigin
+  xrOrigin.current.position.x += moveDirection.x * speed;
+  xrOrigin.current.position.z += moveDirection.z * speed;
+});
+```
+
+## How to Move with XRReferenceSpace
+
+To move this XRReferenceSpace, we need to apply a translation to it. The base code of movement is the same as with xrOrigin (get joystick value and head orientation and then apply translation). Here is how to apply translation:
+
+```js
+// Base code of movement
+
+const offsetTransform = new XRRigidTransform(
+  {
+    x: -moveDirection.x * speed,
+    y: 0,
+    z: -moveDirection.z * speed,
+  },
+  { x: 0, y: 0, z: 0, w: 1 } // Optional (a quaternion for reference space rotation, here it's a null rotation just to show)
+);
+
+try {
+  const newReferenceSpace =
+    referenceSpace.getOffsetReferenceSpace(offsetTransform);
+  this.context.renderer.xr.setReferenceSpace(newReferenceSpace);
+} catch (e) {
+  console.error("Error during referenceSpace modification", e);
+}
+```
