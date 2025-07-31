@@ -155,7 +155,7 @@ One issue that appears is that moving only the XROrigin makes the player's real 
 
 Before, make sure you have access to an XROrigin reference.
 
-```js
+```typescript
 useFrame(() => {
   if (xrOrigin?.current == null || controller == null) {
     return;
@@ -206,7 +206,7 @@ useFrame(() => {
 
 To move this XRReferenceSpace, we need to apply a translation to it. The base code of movement is the same as with xrOrigin (get joystick value and head orientation and then apply translation). Here is how to apply translation:
 
-```js
+```typescript
 // Base code of movement
 
 const offsetTransform = new XRRigidTransform(
